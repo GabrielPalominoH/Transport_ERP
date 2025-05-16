@@ -53,12 +53,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initAuth: async () => {
     if (get().isListenerAttached || !auth) {
       if (!auth) console.warn("Auth service not available for initAuth.");
-      if (get().isListenerAttached) console.debug("Auth listener already attached, skipping duplicate."); // Changed to debug
+      // if (get().isListenerAttached) console.debug("Auth listener already attached, skipping duplicate.");
       if (!auth && get().isLoading) set({ isLoading: false });
       return;
     }
     set({ isListenerAttached: true }); 
-    console.debug("Attaching Firebase Auth state listener."); // Changed to debug
+    // console.debug("Attaching Firebase Auth state listener."); 
 
     onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -87,7 +87,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           console.error(profileError);
         }
         
-        const currentUserName = fetchedUserData.nombre || user.displayName || user.email || 'Usuario';
+        const currentUserNameFromAuth = user.displayName || user.email || 'Usuario';
+        const currentUserName = fetchedUserData.nombre || currentUserNameFromAuth;
         const currentUserEmail = user.email || '';
         const currentUserDni = fetchedUserData.dni || '';
 
@@ -122,23 +123,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await signInWithEmailAndPassword(auth, email, clave);
       return true; 
     } catch (e: any) {
-      console.error("Error during login:", e.code, e.message);
       let displayError = 'Ocurrió un error al intentar iniciar sesión.';
-      
+      let isCommonAuthError = false;
+
       if (e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found') {
         displayError = 'Correo electrónico o contraseña incorrectos. Por favor, verifique sus credenciales.';
+        isCommonAuthError = true;
       } else if (e.code === 'auth/too-many-requests') {
         displayError = 'Se ha bloqueado el acceso debido a demasiados intentos fallidos. Inténtelo más tarde.';
+        isCommonAuthError = true;
       } else if (e.code === 'auth/network-request-failed') {
         displayError = 'Error de red. Por favor, verifique su conexión a internet.';
+        // For network errors, console.error is still appropriate.
       } else if (e.code === 'auth/invalid-email') {
         displayError = 'El formato del correo electrónico no es válido.';
+        isCommonAuthError = true;
       }
-      // Catch all for other Firebase auth errors, preferring e.message if it's somewhat user-friendly
-      // else if (e.message && !e.message.toLowerCase().includes('firebase')) { 
-      //   displayError = e.message;
-      // }
+      // Add other Firebase error codes as needed for specific user messages.
 
+      if (isCommonAuthError) {
+        console.warn(`Login attempt failed for email "${email}" - Code: ${e.code}. Firebase Message: ${e.message}. User will see: "${displayError}"`);
+      } else if (e.code === 'auth/network-request-failed') {
+        console.error(`Network error during login for email "${email}":`, e.code, e.message, e);
+      } else {
+        console.error(`Unexpected error during login for email "${email}":`, e.code, e.message, e);
+      }
+      
       set({ error: displayError, isLoading: false });
       return false;
     }
@@ -164,10 +174,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const userForFirestore: Omit<Usuario, 'id' | 'email'> = { nombre, dni };
       await setDoc(doc(firestoreInstance, "usuarios", firebaseUser.uid), userForFirestore);
       
-      // Do not automatically log in, user should log in after registration.
-      // Set isLoading to false, clear any potential error, but keep isAuthenticated false.
       set({ isLoading: false, error: null });
-      return true; // Indicate success for UI feedback (e.g., redirect to login)
+      return true; 
     } catch (e: any) {
       console.error("Error during registration:", e.code, e.message);
       let errorMessage = e.message || 'Error durante el registro.';
@@ -197,13 +205,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({isLoading: true});
     try {
       await signOut(auth);
-      // onAuthStateChanged will handle setting user to null and isAuthenticated to false
-      // No need to manually set currentUser to null here if onAuthStateChanged is robust
     } catch (e:any) {
       console.error("Error during logout:", e);
       set({ error: e.message || 'Error al cerrar sesión.', isLoading: false }); 
     }
-    // Explicitly set loading false after signOut attempt, even if onAuthStateChanged handles the rest
     set({ isLoading: false });
   },
 }));
+
