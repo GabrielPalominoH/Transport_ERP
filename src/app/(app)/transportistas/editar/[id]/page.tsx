@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useTransportistaStore } from '@/stores/transportistaStore';
-import { TransportistaForm } from '../../components/TransportistaForm';
+import { TransportistaForm } from '@/app/transportistas/components/TransportistaForm'; // Adjusted import path
 import type { Transportista } from '@/interfaces/transportista';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,13 +25,10 @@ export default function EditTransportistaPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    // Ensure transportistas are loaded, then find the specific one.
-    // This is important if the user navigates directly to this page.
     const loadTransportista = async () => {
       if (transportistas.length === 0) {
-        await fetchTransportistas(); // fetch if not already populated
+        await fetchTransportistas(); 
       }
-      // getTransportistaById will now use the potentially updated list
       const currentTransportista = useTransportistaStore.getState().getTransportistaById(id as string);
       if (currentTransportista) {
         setTransportista(currentTransportista);
@@ -77,7 +74,6 @@ export default function EditTransportistaPage() {
   }
 
   if (!transportista) {
-    // Already handled by toast and redirect in useEffect, but as a fallback
     return <p>Transportista no encontrado.</p>; 
   }
 

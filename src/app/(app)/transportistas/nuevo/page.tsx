@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTransportistaStore } from '@/stores/transportistaStore';
-import { TransportistaForm } from '../components/TransportistaForm';
+import { TransportistaForm } from '@/app/transportistas/components/TransportistaForm'; // Adjusted import path
 import type { Transportista } from '@/interfaces/transportista';
 import { useToast } from "@/hooks/use-toast";
 

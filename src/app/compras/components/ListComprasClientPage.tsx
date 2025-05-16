@@ -18,6 +18,7 @@ import { PaginationControls } from '@/components/common/PaginationControls';
 import { PurchaseFiltersComponent } from './PurchaseFilters';
 import { AssignTransportModal } from './AssignTransportModal';
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from '@/lib/formatting'; // Import formatCurrency
 
 const ITEMS_PER_PAGE = 10;
 
@@ -53,7 +54,9 @@ export default function ListComprasClientPage() {
         transportista?.nombre.toLowerCase().includes(searchTermLower) ||
         transportista?.ruc.includes(searchTermLower) ||
         compra.materiaPrima.toLowerCase().includes(searchTermLower) ||
-        compra.codigo.toLowerCase().includes(searchTermLower);
+        compra.codigo.toLowerCase().includes(searchTermLower) ||
+        (compra.codigoFactura && compra.codigoFactura.toLowerCase().includes(searchTermLower));
+
 
       const matchMateriaPrima = !filters.materiaPrima || compra.materiaPrima.toLowerCase().includes(filters.materiaPrima.toLowerCase());
       
@@ -140,6 +143,7 @@ export default function ListComprasClientPage() {
                       <TableHead>Código</TableHead>
                       <TableHead>Proveedor</TableHead>
                       <TableHead>Materia Prima</TableHead>
+                      <TableHead>Factura Transp.</TableHead> {/* Added column */}
                       <TableHead>Fecha Compra</TableHead>
                       <TableHead className="text-right">Costo Total</TableHead>
                       <TableHead className="text-right">Saldo</TableHead>
@@ -159,9 +163,10 @@ export default function ListComprasClientPage() {
                             <TableCell className="font-mono">{compra.codigo}</TableCell>
                             <TableCell>{proveedor ? `${proveedor.nombre} (${proveedor.ruc})` : 'N/A'}</TableCell>
                             <TableCell>{compra.materiaPrima}</TableCell>
+                            <TableCell>{compra.codigoFactura || 'N/A'}</TableCell> {/* Display data */}
                             <TableCell>{format(parseISO(compra.fechaCompra), 'dd/MM/yyyy')}</TableCell>
-                            <TableCell className="text-right">${compra.costoTransporteTotal.toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-semibold">${compra.saldoTotal.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(compra.costoTransporteTotal)}</TableCell> {/* Currency format */}
+                            <TableCell className="text-right font-semibold">{formatCurrency(compra.saldoTotal)}</TableCell> {/* Currency format */}
                             <TableCell><Badge variant={compra.estadoServicio === 'pagado' ? 'default' : 'secondary'}>{compra.estadoServicio}</Badge></TableCell>
                             <TableCell>{transportista ? transportista.nombre : <span className="text-muted-foreground italic">No asignado</span>}</TableCell>
                             <TableCell>
@@ -196,7 +201,7 @@ export default function ListComprasClientPage() {
                       })
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={10} className="text-center h-24">
+                        <TableCell colSpan={11} className="text-center h-24"> {/* Updated colSpan */}
                           {filters.searchTerm || filters.materiaPrima || filters.estadoServicio || filters.fechaInicio || filters.fechaFin ? "No se encontraron compras con esos filtros." : "No hay compras registradas."}
                         </TableCell>
                       </TableRow>

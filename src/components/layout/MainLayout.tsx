@@ -2,7 +2,8 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useAuthStore } from '@/stores/authStore';
 import {
   SidebarProvider,
   Sidebar,
@@ -16,7 +17,7 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Home, Truck, Users, ShoppingCart, Settings, LogOut, Building } from 'lucide-react'; // Added Building for Suppliers
+import { ShoppingCart, Truck, Building, Settings, LogOut, UserCircle, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface NavItem {
@@ -34,6 +35,23 @@ const navItems: NavItem[] = [
 
 export default function MainLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { currentUser, logout, isLoading: authLoading } = useAuthStore();
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/login');
+  };
+
+  const userInitials = currentUser?.nombre
+    ? currentUser.nombre
+        .split(' ')
+        .map(n => n[0])
+        .join('')
+        .substring(0, 2)
+        .toUpperCase()
+    : 'JD';
+
 
   return (
     <SidebarProvider defaultOpen>
@@ -60,7 +78,7 @@ export default function MainLayout({ children }: { children: ReactNode }) {
                     isActive={item.matchSubpaths ? pathname.startsWith(item.href) : pathname === item.href}
                     tooltip={item.label}
                   >
-                    <a> {/* <a> tag is important here when asChild is true with Link from next/link */}
+                    <a>
                       {item.icon}
                       <span>{item.label}</span>
                     </a>
@@ -71,27 +89,37 @@ export default function MainLayout({ children }: { children: ReactNode }) {
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="p-4 border-t border-sidebar-border">
-          <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
-            <Avatar className="h-9 w-9">
-              <AvatarImage src="https://placehold.co/100x100.png" alt="User Avatar" data-ai-hint="user avatar" />
-              <AvatarFallback>JD</AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-              <p className="text-sm font-medium">John Doe</p>
-              <p className="text-xs text-muted-foreground">john.doe@example.com</p>
+          {currentUser ? (
+            <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
+              <Avatar className="h-9 w-9">
+                {/* Placeholder for potential user image logic */}
+                {/* <AvatarImage src={currentUser.avatarUrl} alt="User Avatar" /> */}
+                <AvatarFallback>{userInitials}</AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+                <p className="text-sm font-medium truncate" title={currentUser.nombre}>{currentUser.nombre}</p>
+                <p className="text-xs text-muted-foreground">{currentUser.dni}</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
+              <UserCircle className="h-9 w-9 text-muted-foreground"/>
+               <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+                <p className="text-sm font-medium">Invitado</p>
+              </div>
+            </div>
+          )}
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b bg-background/80 px-6 backdrop-blur-sm md:justify-end">
-           <SidebarTrigger className="md:hidden" /> {/* Hamburger for mobile */}
-          <Button variant="ghost" size="icon">
+           <SidebarTrigger className="md:hidden" />
+          {/* <Button variant="ghost" size="icon" aria-label="Settings">
             <Settings className="h-5 w-5" />
             <span className="sr-only">Settings</span>
-          </Button>
-          <Button variant="ghost" size="icon">
-            <LogOut className="h-5 w-5" />
+          </Button> */}
+          <Button variant="ghost" size="icon" onClick={handleLogout} disabled={authLoading} aria-label="Logout">
+            {authLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <LogOut className="h-5 w-5" />}
             <span className="sr-only">Logout</span>
           </Button>
         </header>

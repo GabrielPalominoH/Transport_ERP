@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import { Inter as FontSans } from 'next/font/google'; // Using Inter as a clean sans-serif font
+import { Inter as FontSans } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
-import MainLayout from '@/components/layout/MainLayout';
+// Removed MainLayout from here, it will be in (app)/layout.tsx
 import { Toaster } from "@/components/ui/toaster";
-
+import AuthInitializer from '@/components/auth/AuthInitializer';
 
 const fontSans = FontSans({
   subsets: ['latin'],
@@ -24,7 +24,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={cn('min-h-screen bg-background font-sans antialiased', fontSans.variable)}>
-        <MainLayout>{children}</MainLayout>
+        <AuthInitializer />
+        {children}
         <Toaster />
       </body>
     </html>

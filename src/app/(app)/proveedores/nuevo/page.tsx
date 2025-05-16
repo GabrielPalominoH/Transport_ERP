@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useProveedorStore } from '@/stores/proveedorStore';
-import { ProveedorForm } from '../components/ProveedorForm';
+import { ProveedorForm } from '@/app/proveedores/components/ProveedorForm'; // Adjusted import path
 import type { Proveedor } from '@/interfaces/proveedor';
 import { useToast } from "@/hooks/use-toast";
 
