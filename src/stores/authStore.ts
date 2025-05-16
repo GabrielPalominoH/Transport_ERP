@@ -1,3 +1,4 @@
+
 // @ts-nocheck
 "use client";
 
@@ -159,6 +160,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ error: 'El correo electrónico no es válido.', isLoading: false });
       } else if (e.code === 'auth/weak-password') {
         set({ error: 'La contraseña es demasiado débil.', isLoading: false });
+      } else if (e.code === 'auth/configuration-not-found') {
+        console.error("Firebase Authentication (Email/Password) is likely not enabled in your Firebase project console, or your firebaseConfig (apiKey, authDomain) is incorrect.");
+        set({ error: 'Error de configuración de Firebase Auth. Verifique la consola de Firebase y la configuración del proyecto.', isLoading: false });
       }
       else {
         set({ error: e.message || 'Error durante el registro.', isLoading: false });
@@ -187,3 +191,4 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 // Ensure initAuth is called once when the store is created/app loads.
 // This is typically done in a top-level component like _app.tsx or Layout.tsx
 // For this setup, AuthInitializer.tsx handles this.
+
