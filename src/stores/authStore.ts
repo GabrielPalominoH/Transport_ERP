@@ -59,43 +59,57 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ isLoading: false });
         return;
     }
-    set({ isLoading: true });
+    // No need to set isLoading: true here if it's already true by default
+    // and onAuthStateChanged will manage it.
+    
     onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // User is signed in, now fetch additional user data from Firestore
-        if (!firestoreInstance) {
-            console.error("Firestore not initialized, cannot fetch user details.");
-            set({ firebaseUser: user, currentUser: null, isAuthenticated: true, isLoading: false, error: "Failed to load user profile." });
-            return;
-        }
-        const userDocRef = doc(firestoreInstance, "usuarios", user.uid);
-        try {
+        // User is signed in via Firebase Auth
+        set({ firebaseUser: user, isAuthenticated: true, isLoading: true }); // isLoading to true while fetching profile
+
+        let fetchedUserData: Partial<Omit<Usuario, 'id' | 'email'>> = {};
+        let profileError: string | null = null;
+
+        if (firestoreInstance) {
+          const userDocRef = doc(firestoreInstance, "usuarios", user.uid);
+          try {
             const docSnap = await getDoc(userDocRef);
             if (docSnap.exists()) {
-              const userData = docSnap.data() as Omit<Usuario, 'id'>; // id is uid from auth
-              set({ 
-                firebaseUser: user, 
-                currentUser: { id: user.uid, email: user.email!, ...userData }, 
-                isAuthenticated: true, 
-                isLoading: false 
-              });
+              const firestoreData = docSnap.data() as Omit<Usuario, 'id' | 'email'>;
+              fetchedUserData = { nombre: firestoreData.nombre, dni: firestoreData.dni };
             } else {
-              // This case might happen if Firestore document wasn't created or was deleted
-              console.warn("User document not found in Firestore for UID:", user.uid);
-              set({ firebaseUser: user, currentUser: {id: user.uid, nombre: user.displayName || user.email!, dni: '', email: user.email! }, isAuthenticated: true, isLoading: false, error: "User profile incomplete." });
+              profileError = "Documento de perfil de usuario no encontrado en Firestore.";
+              console.warn(profileError, user.uid);
             }
-        } catch (firestoreError) {
-            console.error("Error fetching user document from Firestore:", firestoreError);
-            set({ firebaseUser: user, currentUser: null, isAuthenticated: true, isLoading: false, error: "Error loading user profile." });
+          } catch (firestoreErrorErr) {
+            profileError = "Error al obtener el perfil de usuario desde Firestore.";
+            console.error(profileError, firestoreErrorErr);
+          }
+        } else {
+          profileError = "Firestore no inicializado, no se puede obtener el perfil completo del usuario.";
+          console.error(profileError);
         }
+
+        set(state => ({
+          ...state, // Keep existing state like firebaseUser, isAuthenticated
+          currentUser: {
+            id: user.uid,
+            email: user.email || '',
+            nombre: fetchedUserData.nombre || user.displayName || user.email || 'Usuario', // Fallback logic for name
+            dni: fetchedUserData.dni || '',
+          },
+          isLoading: false, // Auth process (including profile fetch) is complete
+          error: state.error || profileError, // Preserve existing auth errors or set new profile-related error
+        }));
+
       } else {
         // User is signed out
-        set({ currentUser: null, firebaseUser: null, isAuthenticated: false, isLoading: false });
+        set({ currentUser: null, firebaseUser: null, isAuthenticated: false, isLoading: false, error: null });
       }
-    }, (error) => {
+    }, (errorListener) => {
         // Handle errors from onAuthStateChanged itself
-        console.error("Error in onAuthStateChanged listener:", error);
-        set({ currentUser: null, firebaseUser: null, isAuthenticated: false, isLoading: false, error: "Session listener error." });
+        console.error("Error en el listener de onAuthStateChanged:", errorListener);
+        set({ currentUser: null, firebaseUser: null, isAuthenticated: false, isLoading: false, error: "Error en el listener de sesión." });
     });
   },
 
@@ -107,9 +121,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       await signInWithEmailAndPassword(auth, email, clave);
-      // onAuthStateChanged will handle setting user state
-      // No need to explicitly call fetchUsers or saveCurrentUser here with Firebase Auth
-      // If login is successful, initAuth's onAuthStateChanged callback will update the store.
+      // onAuthStateChanged will handle setting user state.
+      // isLoading will be set to false by onAuthStateChanged when done.
       return true; 
     } catch (e: any) {
       console.error("Error during login:", e);
@@ -133,43 +146,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const userCredential = await createUserWithEmailAndPassword(auth, email, clave);
       const firebaseUser = userCredential.user;
 
-      // Update Firebase Auth profile (optional, but good practice)
       await updateProfile(firebaseUser, { displayName: nombre });
 
-      // Save additional user info to Firestore
-      const userForFirestore: Omit<Usuario, 'id' | 'email'> = { nombre, dni }; // id is uid, email from auth
+      const userForFirestore: Omit<Usuario, 'id' | 'email'> = { nombre, dni };
       await setDoc(doc(firestoreInstance, "usuarios", firebaseUser.uid), userForFirestore);
       
-      // onAuthStateChanged will handle setting user state, or you can set it partially here
-      // For now, let's assume onAuthStateChanged will pick it up.
-      // If immediate update is needed:
-      // set({ 
-      //   firebaseUser: firebaseUser, 
-      //   currentUser: { id: firebaseUser.uid, nombre, dni, email }, 
-      //   isAuthenticated: true, 
-      //   isLoading: false 
-      // });
-      set({ isLoading: false }); // Let onAuthStateChanged handle the full state update
+      // onAuthStateChanged will handle the full state update, including setting isLoading to false.
+      // No need to set isLoading: false here directly as onAuthStateChanged will fire.
       return true;
     } catch (e: any) {
       console.error("Error during registration:", e);
-      // Check for specific Firebase error codes for better messages
+      let errorMessage = e.message || 'Error durante el registro.';
       if (e.code === 'auth/email-already-in-use') {
-        set({ error: 'El correo electrónico ya está registrado.', isLoading: false });
+        errorMessage = 'El correo electrónico ya está registrado.';
       } else if (e.code === 'auth/invalid-email') {
-        set({ error: 'El correo electrónico no es válido.', isLoading: false });
+        errorMessage = 'El correo electrónico no es válido.';
       } else if (e.code === 'auth/weak-password') {
-        set({ error: 'La contraseña es demasiado débil.', isLoading: false });
+        errorMessage = 'La contraseña es demasiado débil.';
       } else if (e.code === 'auth/configuration-not-found') {
+        errorMessage = 'Error de configuración de Firebase Auth. Verifique la consola de Firebase y la configuración del proyecto.';
         console.error("Firebase Authentication (Email/Password) is likely not enabled in your Firebase project console, or your firebaseConfig (apiKey, authDomain) is incorrect.");
-        set({ error: 'Error de configuración de Firebase Auth. Verifique la consola de Firebase y la configuración del proyecto.', isLoading: false });
       } else if (e.code === 'auth/operation-not-allowed') {
+        errorMessage = 'El registro por correo y contraseña no está habilitado para este proyecto. Contacte al administrador.';
         console.error("Email/Password sign-in is not enabled in the Firebase console. Go to Firebase console -> Authentication -> Sign-in method and enable Email/Password.");
-        set({ error: 'El registro por correo y contraseña no está habilitado para este proyecto. Contacte al administrador.', isLoading: false });
       }
-      else {
-        set({ error: e.message || 'Error durante el registro.', isLoading: false });
-      }
+      set({ error: errorMessage, isLoading: false });
       return false;
     }
   },
@@ -179,19 +180,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ error: 'Servicio de autenticación no disponible.', isLoading: false });
         return;
     }
-    set({isLoading: true});
+    set({isLoading: true}); // isLoading true during logout process
     try {
       await signOut(auth);
-      // onAuthStateChanged will set currentUser to null
-      set({ currentUser: null, firebaseUser: null, isAuthenticated: false, error: null, isLoading: false });
+      // onAuthStateChanged will set currentUser to null, isAuthenticated to false, and isLoading to false.
     } catch (e:any) {
       console.error("Error during logout:", e);
-      set({ error: e.message || 'Error al cerrar sesión.', isLoading: false });
+      set({ error: e.message || 'Error al cerrar sesión.', isLoading: false }); // Ensure isLoading is false on error
     }
   },
 }));
-
-// Ensure initAuth is called once when the store is created/app loads.
-// This is typically done in a top-level component like _app.tsx or Layout.tsx
-// For this setup, AuthInitializer.tsx handles this.
-
