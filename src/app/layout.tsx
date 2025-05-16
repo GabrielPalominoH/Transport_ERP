@@ -12,7 +12,7 @@ const fontSans = FontSans({
 });
 
 export const metadata: Metadata = {
-  title: 'Transport ERP Lite',
+  title: 'Transport Medanos', // Updated title
   description: 'Lite ERP for transport management',
 };
 
