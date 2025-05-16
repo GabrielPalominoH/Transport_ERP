@@ -37,9 +37,9 @@ export default function LoginPage() {
     },
   });
 
-  useEffect(() => {
-    clearError();
-  }, [clearError]);
+  // useEffect(() => {
+  //   clearError(); // Removed this to prevent premature error clearing
+  // }, [clearError]);
 
   useEffect(() => {
     if (isAuthenticated) {
