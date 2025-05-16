@@ -116,7 +116,7 @@ export function PurchaseForm({ onSubmit, initialData, isSubmitting }: PurchaseFo
                 <FormItem>
                   <FormLabel>Materia Prima</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ej: Arena Gruesa" {...field} />
+                    <Input placeholder="Ej: Granada" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

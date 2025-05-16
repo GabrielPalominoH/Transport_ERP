@@ -4,7 +4,6 @@
 
 import { create } from 'zustand';
 import type { Usuario } from '../interfaces/usuario';
-import { v4 as uuidv4 } from 'uuid';
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { 
   getAuth, 
@@ -34,7 +33,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
-  isListenerAttached: boolean; // New flag
+  isListenerAttached: boolean; 
   initAuth: () => Promise<void>; 
   login: (email: string, clave: string) => Promise<boolean>;
   register: (nombre: string, dni: string, email: string, clave: string, codigoMaestro: string) => Promise<boolean>;
@@ -48,19 +47,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   isLoading: true, 
   error: null,
-  isListenerAttached: false, // Initialize flag
+  isListenerAttached: false, 
   clearError: () => set({ error: null }),
 
   initAuth: async () => {
     if (get().isListenerAttached || !auth) {
       if (!auth) console.warn("Auth service not available for initAuth.");
-      if (get().isListenerAttached) console.log("Auth listener already attached.");
-      // If no auth, ensure loading is false if it was true
+      if (get().isListenerAttached) console.debug("Auth listener already attached, skipping duplicate."); // Changed to debug
       if (!auth && get().isLoading) set({ isLoading: false });
       return;
     }
-    set({ isListenerAttached: true }); // Set flag
-    
+    set({ isListenerAttached: true }); 
+    console.debug("Attaching Firebase Auth state listener."); // Changed to debug
+
     onAuthStateChanged(auth, async (user) => {
       if (user) {
         set({ firebaseUser: user, isAuthenticated: true, isLoading: true }); 
@@ -78,9 +77,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             } else {
               profileError = "Documento de perfil de usuario no encontrado en Firestore.";
               console.warn(profileError, user.uid);
-              // Attempt to create profile if missing for an authenticated user (e.g., if DB write failed during register)
-              // This is optional and depends on desired behavior.
-              // For now, we'll just log the warning.
             }
           } catch (firestoreErrorErr) {
             profileError = "Error al obtener el perfil de usuario desde Firestore.";
@@ -91,16 +87,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           console.error(profileError);
         }
         
-        // Ensure currentUser is populated with at least basic Firebase Auth info
         const currentUserName = fetchedUserData.nombre || user.displayName || user.email || 'Usuario';
+        const currentUserEmail = user.email || '';
+        const currentUserDni = fetchedUserData.dni || '';
 
         set(state => ({
           ...state,
           currentUser: {
             id: user.uid,
-            email: user.email || '',
+            email: currentUserEmail,
             nombre: currentUserName,
-            dni: fetchedUserData.dni || '',
+            dni: currentUserDni,
           },
           isLoading: false, 
           error: state.error || profileError, 
@@ -125,8 +122,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await signInWithEmailAndPassword(auth, email, clave);
       return true; 
     } catch (e: any) {
-      console.error("Error during login:", e);
-      set({ error: e.message || 'Email o contraseña incorrectos.', isLoading: false });
+      console.error("Error during login:", e.code, e.message);
+      let displayError = 'Ocurrió un error al intentar iniciar sesión.';
+      
+      if (e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found') {
+        displayError = 'Correo electrónico o contraseña incorrectos. Por favor, verifique sus credenciales.';
+      } else if (e.code === 'auth/too-many-requests') {
+        displayError = 'Se ha bloqueado el acceso debido a demasiados intentos fallidos. Inténtelo más tarde.';
+      } else if (e.code === 'auth/network-request-failed') {
+        displayError = 'Error de red. Por favor, verifique su conexión a internet.';
+      } else if (e.code === 'auth/invalid-email') {
+        displayError = 'El formato del correo electrónico no es válido.';
+      }
+      // Catch all for other Firebase auth errors, preferring e.message if it's somewhat user-friendly
+      // else if (e.message && !e.message.toLowerCase().includes('firebase')) { 
+      //   displayError = e.message;
+      // }
+
+      set({ error: displayError, isLoading: false });
       return false;
     }
   },
@@ -151,16 +164,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const userForFirestore: Omit<Usuario, 'id' | 'email'> = { nombre, dni };
       await setDoc(doc(firestoreInstance, "usuarios", firebaseUser.uid), userForFirestore);
       
-      return true;
+      // Do not automatically log in, user should log in after registration.
+      // Set isLoading to false, clear any potential error, but keep isAuthenticated false.
+      set({ isLoading: false, error: null });
+      return true; // Indicate success for UI feedback (e.g., redirect to login)
     } catch (e: any) {
-      console.error("Error during registration:", e);
+      console.error("Error during registration:", e.code, e.message);
       let errorMessage = e.message || 'Error durante el registro.';
       if (e.code === 'auth/email-already-in-use') {
         errorMessage = 'El correo electrónico ya está registrado.';
       } else if (e.code === 'auth/invalid-email') {
         errorMessage = 'El correo electrónico no es válido.';
       } else if (e.code === 'auth/weak-password') {
-        errorMessage = 'La contraseña es demasiado débil.';
+        errorMessage = 'La contraseña es demasiado débil (debe tener al menos 6 caracteres).';
       } else if (e.code === 'auth/configuration-not-found') {
         errorMessage = 'Error de configuración de Firebase Auth. Verifique la consola de Firebase y la configuración del proyecto (Email/Password provider debe estar habilitado).';
         console.error("Firebase Authentication (Email/Password) is likely not enabled in your Firebase project console, or your firebaseConfig (apiKey, authDomain) is incorrect.");
@@ -181,10 +197,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({isLoading: true});
     try {
       await signOut(auth);
+      // onAuthStateChanged will handle setting user to null and isAuthenticated to false
+      // No need to manually set currentUser to null here if onAuthStateChanged is robust
     } catch (e:any) {
       console.error("Error during logout:", e);
       set({ error: e.message || 'Error al cerrar sesión.', isLoading: false }); 
     }
+    // Explicitly set loading false after signOut attempt, even if onAuthStateChanged handles the rest
+    set({ isLoading: false });
   },
 }));
-

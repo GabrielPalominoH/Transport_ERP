@@ -25,7 +25,7 @@ export function PaginationControls({
      return <p className="py-4 text-sm text-muted-foreground">No entries found.</p>;
   }
    if (totalPages <= 1 && totalItems !== undefined && totalItems <= (itemsPerPage ?? 10) ) {
-     return <p className="py-4 text-sm text-muted-foreground">Showing {totalItems} {totalItems === 1 ? "entry" : "entries"}.</p>;
+     return <p className="py-4 text-sm text-muted-foreground">Se encontro {totalItems} {totalItems === 1 ? "resultado" : "entries"}.</p>;
   }
 
 
