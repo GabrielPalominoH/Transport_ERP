@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -143,7 +144,7 @@ export default function ListComprasClientPage() {
                       <TableHead>Código</TableHead>
                       <TableHead>Proveedor</TableHead>
                       <TableHead>Materia Prima</TableHead>
-                      <TableHead>Factura Transp.</TableHead> {/* Added column */}
+                      <TableHead>Factura Transp.</TableHead>
                       <TableHead>Fecha Compra</TableHead>
                       <TableHead className="text-right">Costo Total</TableHead>
                       <TableHead className="text-right">Saldo</TableHead>
@@ -229,3 +230,6 @@ export default function ListComprasClientPage() {
     </div>
   );
 }
+
+
+    
