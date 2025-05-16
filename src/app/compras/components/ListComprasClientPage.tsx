@@ -164,10 +164,10 @@ export default function ListComprasClientPage() {
                             <TableCell className="font-mono">{compra.codigo}</TableCell>
                             <TableCell>{proveedor ? `${proveedor.nombre} (${proveedor.ruc})` : 'N/A'}</TableCell>
                             <TableCell>{compra.materiaPrima}</TableCell>
-                            <TableCell>{compra.codigoFactura || 'N/A'}</TableCell> {/* Display data */}
+                            <TableCell>{compra.codigoFactura || 'N/A'}</TableCell>{/* Ensure no newline/space before next TableCell */}
                             <TableCell>{format(parseISO(compra.fechaCompra), 'dd/MM/yyyy')}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(compra.costoTransporteTotal)}</TableCell> {/* Currency format */}
-                            <TableCell className="text-right font-semibold">{formatCurrency(compra.saldoTotal)}</TableCell> {/* Currency format */}
+                            <TableCell className="text-right">{formatCurrency(compra.costoTransporteTotal)}</TableCell>{/* Currency format */}
+                            <TableCell className="text-right font-semibold">{formatCurrency(compra.saldoTotal)}</TableCell>{/* Currency format */}
                             <TableCell><Badge variant={compra.estadoServicio === 'pagado' ? 'default' : 'secondary'}>{compra.estadoServicio}</Badge></TableCell>
                             <TableCell>{transportista ? transportista.nombre : <span className="text-muted-foreground italic">No asignado</span>}</TableCell>
                             <TableCell>
@@ -230,6 +230,3 @@ export default function ListComprasClientPage() {
     </div>
   );
 }
-
-
-    
