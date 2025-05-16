@@ -1,17 +1,17 @@
+
 "use client";
 
 import { useEffect } from 'react';
 import { useAuthStore } from '@/stores/authStore';
 
 export default function AuthInitializer() {
-  const { initAuth, isLoading } = useAuthStore();
+  const { initAuth } = useAuthStore();
 
   useEffect(() => {
-    // Prevent re-initializing if already loading or initialized
-    if (isLoading && !useAuthStore.getState().currentUser) {
-        initAuth();
-    }
-  }, [initAuth, isLoading]);
+    // initAuth itself is now guarded against multiple listener attachments
+    initAuth();
+  }, [initAuth]); // Dependency array ensures it's called once on mount, initAuth is stable
 
-  return null; // This component doesn't render anything
+  return null;
 }
+

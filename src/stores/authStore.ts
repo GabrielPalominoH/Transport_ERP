@@ -16,28 +16,25 @@ import {
   updateProfile
 } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, type Firestore } from 'firebase/firestore';
-import { app as firebaseAppInstance, db as firestoreInstance } from '@/lib/firebase'; // Use existing initialized app and db
+import { app as firebaseAppInstance, db as firestoreInstance } from '@/lib/firebase'; 
 
 
-// Ensure Firebase app is initialized (especially for auth)
-// This might be redundant if firebase.ts already does this robustly,
-// but auth operations often need getAuth() called after initializeApp().
 let auth: Auth;
 if (firebaseAppInstance) {
   auth = getAuth(firebaseAppInstance);
 } else {
   console.error("Firebase app is not initialized in firebase.ts. Auth features may not work.");
-  // Potentially initialize a local instance if absolutely necessary, though it's better to rely on the central one.
 }
 
 const CODIGO_MAESTRO_REGISTRO = "ALM2025"; 
 
 interface AuthState {
-  currentUser: Usuario | null; // Stores { uid, nombre, dni, email (from Firebase Auth) }
-  firebaseUser: import('firebase/auth').User | null; // Raw Firebase user object
+  currentUser: Usuario | null; 
+  firebaseUser: import('firebase/auth').User | null; 
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  isListenerAttached: boolean; // New flag
   initAuth: () => Promise<void>; 
   login: (email: string, clave: string) => Promise<boolean>;
   register: (nombre: string, dni: string, email: string, clave: string, codigoMaestro: string) => Promise<boolean>;
@@ -51,21 +48,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: false,
   isLoading: true, 
   error: null,
+  isListenerAttached: false, // Initialize flag
   clearError: () => set({ error: null }),
 
   initAuth: async () => {
-    if (!auth) {
-        console.warn("Auth service not available for initAuth.");
-        set({ isLoading: false });
-        return;
+    if (get().isListenerAttached || !auth) {
+      if (!auth) console.warn("Auth service not available for initAuth.");
+      if (get().isListenerAttached) console.log("Auth listener already attached.");
+      // If no auth, ensure loading is false if it was true
+      if (!auth && get().isLoading) set({ isLoading: false });
+      return;
     }
-    // No need to set isLoading: true here if it's already true by default
-    // and onAuthStateChanged will manage it.
+    set({ isListenerAttached: true }); // Set flag
     
     onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // User is signed in via Firebase Auth
-        set({ firebaseUser: user, isAuthenticated: true, isLoading: true }); // isLoading to true while fetching profile
+        set({ firebaseUser: user, isAuthenticated: true, isLoading: true }); 
 
         let fetchedUserData: Partial<Omit<Usuario, 'id' | 'email'>> = {};
         let profileError: string | null = null;
@@ -80,6 +78,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             } else {
               profileError = "Documento de perfil de usuario no encontrado en Firestore.";
               console.warn(profileError, user.uid);
+              // Attempt to create profile if missing for an authenticated user (e.g., if DB write failed during register)
+              // This is optional and depends on desired behavior.
+              // For now, we'll just log the warning.
             }
           } catch (firestoreErrorErr) {
             profileError = "Error al obtener el perfil de usuario desde Firestore.";
@@ -89,25 +90,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           profileError = "Firestore no inicializado, no se puede obtener el perfil completo del usuario.";
           console.error(profileError);
         }
+        
+        // Ensure currentUser is populated with at least basic Firebase Auth info
+        const currentUserName = fetchedUserData.nombre || user.displayName || user.email || 'Usuario';
 
         set(state => ({
-          ...state, // Keep existing state like firebaseUser, isAuthenticated
+          ...state,
           currentUser: {
             id: user.uid,
             email: user.email || '',
-            nombre: fetchedUserData.nombre || user.displayName || user.email || 'Usuario', // Fallback logic for name
+            nombre: currentUserName,
             dni: fetchedUserData.dni || '',
           },
-          isLoading: false, // Auth process (including profile fetch) is complete
-          error: state.error || profileError, // Preserve existing auth errors or set new profile-related error
+          isLoading: false, 
+          error: state.error || profileError, 
         }));
 
       } else {
-        // User is signed out
         set({ currentUser: null, firebaseUser: null, isAuthenticated: false, isLoading: false, error: null });
       }
     }, (errorListener) => {
-        // Handle errors from onAuthStateChanged itself
         console.error("Error en el listener de onAuthStateChanged:", errorListener);
         set({ currentUser: null, firebaseUser: null, isAuthenticated: false, isLoading: false, error: "Error en el listener de sesión." });
     });
@@ -121,8 +123,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       await signInWithEmailAndPassword(auth, email, clave);
-      // onAuthStateChanged will handle setting user state.
-      // isLoading will be set to false by onAuthStateChanged when done.
       return true; 
     } catch (e: any) {
       console.error("Error during login:", e);
@@ -151,8 +151,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const userForFirestore: Omit<Usuario, 'id' | 'email'> = { nombre, dni };
       await setDoc(doc(firestoreInstance, "usuarios", firebaseUser.uid), userForFirestore);
       
-      // onAuthStateChanged will handle the full state update, including setting isLoading to false.
-      // No need to set isLoading: false here directly as onAuthStateChanged will fire.
       return true;
     } catch (e: any) {
       console.error("Error during registration:", e);
@@ -164,10 +162,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } else if (e.code === 'auth/weak-password') {
         errorMessage = 'La contraseña es demasiado débil.';
       } else if (e.code === 'auth/configuration-not-found') {
-        errorMessage = 'Error de configuración de Firebase Auth. Verifique la consola de Firebase y la configuración del proyecto.';
+        errorMessage = 'Error de configuración de Firebase Auth. Verifique la consola de Firebase y la configuración del proyecto (Email/Password provider debe estar habilitado).';
         console.error("Firebase Authentication (Email/Password) is likely not enabled in your Firebase project console, or your firebaseConfig (apiKey, authDomain) is incorrect.");
       } else if (e.code === 'auth/operation-not-allowed') {
-        errorMessage = 'El registro por correo y contraseña no está habilitado para este proyecto. Contacte al administrador.';
+        errorMessage = 'El registro por correo y contraseña no está habilitado para este proyecto. Active Email/Password provider en la consola de Firebase.';
         console.error("Email/Password sign-in is not enabled in the Firebase console. Go to Firebase console -> Authentication -> Sign-in method and enable Email/Password.");
       }
       set({ error: errorMessage, isLoading: false });
@@ -180,13 +178,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ error: 'Servicio de autenticación no disponible.', isLoading: false });
         return;
     }
-    set({isLoading: true}); // isLoading true during logout process
+    set({isLoading: true});
     try {
       await signOut(auth);
-      // onAuthStateChanged will set currentUser to null, isAuthenticated to false, and isLoading to false.
     } catch (e:any) {
       console.error("Error during logout:", e);
-      set({ error: e.message || 'Error al cerrar sesión.', isLoading: false }); // Ensure isLoading is false on error
+      set({ error: e.message || 'Error al cerrar sesión.', isLoading: false }); 
     }
   },
 }));
+
