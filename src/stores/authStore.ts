@@ -163,6 +163,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } else if (e.code === 'auth/configuration-not-found') {
         console.error("Firebase Authentication (Email/Password) is likely not enabled in your Firebase project console, or your firebaseConfig (apiKey, authDomain) is incorrect.");
         set({ error: 'Error de configuración de Firebase Auth. Verifique la consola de Firebase y la configuración del proyecto.', isLoading: false });
+      } else if (e.code === 'auth/operation-not-allowed') {
+        console.error("Email/Password sign-in is not enabled in the Firebase console. Go to Firebase console -> Authentication -> Sign-in method and enable Email/Password.");
+        set({ error: 'El registro por correo y contraseña no está habilitado para este proyecto. Contacte al administrador.', isLoading: false });
       }
       else {
         set({ error: e.message || 'Error durante el registro.', isLoading: false });
